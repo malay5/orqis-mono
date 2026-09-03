@@ -97,8 +97,22 @@ Then in a browser: sign up → confirm 5 credits → `/browse` → invoke
 
 The single container is a convenience, not a ceiling. When you outgrow it:
 
-- **Frontend to Vercel** — set `ORQIS_API_URL` to the backend's public URL and
-  deploy the backend container alone. Nothing in the code changes.
+- **Frontend to Vercel** — two variables and one binding change, no code:
+  1. On the frontend: `ORQIS_API_URL=https://your-backend-host`
+  2. On the backend: `ORQIS_BACKEND_HOST=0.0.0.0` and publish port 4000. Inside
+     the single container it binds loopback, which nothing outside can reach.
+  3. On the backend: `CORS_ORIGINS=https://your-frontend-domain`
+
+  **`ORQIS_API_URL` is the one people forget.** Without it the frontend falls
+  back to its local-dev default and every request fails with
+  `connect ECONNREFUSED 127.0.0.1:4000` — which reads as "the backend is down"
+  when the app was simply never told where the backend lives. The frontend has
+  no database of its own, so this breaks every page, not just agent calls. A
+  deployed build now reports the real cause and names the variable.
+
+  Worth weighing before splitting: 11 pages are server-rendered and call the
+  backend on every request, so a cross-host round trip is added to each page
+  load. Co-locating them avoids it entirely.
 - **Agents to their own service** — `orqis-owned-services` is a standalone
   Fastify app with the same 40 agents. Deploy it, point
   `OWNED_SERVICES_BASE_URL` at it, re-seed, and delete the agent code from
