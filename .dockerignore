@@ -21,6 +21,8 @@ docker-compose.override.yml
 # Not needed at build or runtime
 **/*.md
 !README.md
+!LICENSE
+
 apps-script-setup/
 launch-assets/
 tests/
