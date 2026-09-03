@@ -1,9 +1,9 @@
 /**
  * openrouter-chat — dual-mode chat completion over OpenRouter's
  * OpenAI-compatible API. One service backs several catalogue listings
- * (deepseek-chat, mimo-chat, budget-chat); each listing pins a default
+ * (glm-chat, nemotron-chat, budget-chat); each listing pins a default
  * model and, in managed mode, an allowlist so a buyer can't route a
- * 2-credit call to a frontier-priced model on orqis's key.
+ * 1-credit call to a paid model on orqis's key.
  *
  * Modes (same shape as gpt-chat):
  *   1. BYO-key (input.apiKey present) → caller's OpenRouter key, any model.
@@ -51,22 +51,39 @@ export type BudgetModel = {
   slug: string;
   label: string;
   vendor: string;
-  /** Approximate USD per 1M tokens (input / output) at time of listing. */
-  approxPricePerM: { input: number; output: number };
+  /** Context window, tokens. */
+  contextTokens: number;
 };
 
-// Curated cheap tier. Slugs follow OpenRouter's `vendor/model` form and
-// can drift as providers rename releases — OPENROUTER_BUDGET_MODELS
-// (comma-separated slugs) overrides this list without a redeploy.
+/**
+ * Zero-cost tier — every entry is an OpenRouter `:free` model.
+ *
+ * Verified against `GET https://openrouter.ai/api/v1/models` on 2026-09-03.
+ * That endpoint needs no auth, so re-checking costs nothing:
+ *
+ *   npm run smoke:openrouter -- --catalogue
+ *
+ * The previous list was written from memory and one slug was wrong —
+ * `xiaomi/mimo-v2-flash` has never existed, so the agent defaulting to it
+ * failed 100% of the time in managed mode. Don't add a slug here without
+ * confirming it against that endpoint.
+ *
+ * Free models are rate-limited **per OpenRouter account**, not per key, so
+ * heavy traffic can start returning 429s. The invocation proxy refunds on
+ * upstream failure, so that degrades honestly rather than silently charging.
+ *
+ * OPENROUTER_BUDGET_MODELS (comma-separated slugs) overrides this list
+ * without a redeploy.
+ */
 export const BUDGET_MODELS: readonly BudgetModel[] = [
-  { slug: "deepseek/deepseek-chat", label: "DeepSeek V3", vendor: "DeepSeek", approxPricePerM: { input: 0.3, output: 1.2 } },
-  { slug: "deepseek/deepseek-r1", label: "DeepSeek R1 (reasoning)", vendor: "DeepSeek", approxPricePerM: { input: 0.7, output: 2.5 } },
-  { slug: "xiaomi/mimo-v2-flash", label: "MiMo V2 Flash", vendor: "Xiaomi", approxPricePerM: { input: 0.1, output: 0.3 } },
-  { slug: "qwen/qwen3-30b-a3b", label: "Qwen3 30B-A3B", vendor: "Alibaba", approxPricePerM: { input: 0.1, output: 0.3 } },
-  { slug: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", vendor: "Meta", approxPricePerM: { input: 0.1, output: 0.3 } },
-  { slug: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", vendor: "Google", approxPricePerM: { input: 0.1, output: 0.4 } },
-  { slug: "moonshotai/kimi-k2", label: "Kimi K2", vendor: "Moonshot", approxPricePerM: { input: 0.6, output: 2.5 } },
-  { slug: "z-ai/glm-4.5-air", label: "GLM 4.5 Air", vendor: "Zhipu", approxPricePerM: { input: 0.2, output: 1.1 } },
+  { slug: "z-ai/glm-5.2:free", label: "GLM 5.2", vendor: "Z.ai", contextTokens: 256_000 },
+  { slug: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super 120B", vendor: "NVIDIA", contextTokens: 262_144 },
+  { slug: "nvidia/nemotron-3.5-lightning:free", label: "Nemotron 3.5 Lightning", vendor: "NVIDIA", contextTokens: 1_000_000 },
+  { slug: "minimax/minimax-m2.7:free", label: "MiniMax M2.7", vendor: "MiniMax", contextTokens: 196_608 },
+  { slug: "google/gemma-4-31b-it:free", label: "Gemma 4 31B", vendor: "Google", contextTokens: 262_144 },
+  { slug: "inclusionai/ling-3.0-flash-fin:free", label: "Ling 3.0 Flash", vendor: "InclusionAI", contextTokens: 262_144 },
+  { slug: "poolside/laguna-s-2.1:free", label: "Laguna S 2.1", vendor: "Poolside", contextTokens: 262_144 },
+  { slug: "cohere/north-mini-code:free", label: "North Mini Code", vendor: "Cohere", contextTokens: 256_000 },
 ];
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -75,9 +92,10 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // `:nitro`, `:thinking`, etc.).
 const MODEL_RE = /^[a-z0-9-]{2,40}\/[a-zA-Z0-9._-]{2,80}(:[a-z0-9-]{1,20})?$/;
 
-// Managed-mode ceiling is deliberately lower than gpt-chat's 8192 — output
-// tokens are where a "cheap" model call stops being cheap.
-const MANAGED_MAX_TOKENS = 4096;
+// Managed-mode ceiling. Lower than gpt-chat's 8192 because free models are
+// rate-limited per OpenRouter *account*: a handful of long generations can
+// exhaust the shared quota and 429 everyone else.
+const MANAGED_MAX_TOKENS = 2048;
 const BYOK_MAX_TOKENS = 8192;
 
 export type OpenRouterChatMode = "byok" | "managed" | "mock";

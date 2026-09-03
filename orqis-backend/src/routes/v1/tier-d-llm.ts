@@ -47,25 +47,28 @@ function looksLikeMessages(v: unknown): v is { role: string; content: string }[]
 // model and (in managed mode) which models orqis's key may be spent on.
 const OPENROUTER_LISTINGS: readonly OpenRouterListing[] = [
   {
-    agent: "deepseek-chat",
-    defaultModel: "deepseek/deepseek-chat",
-    allowedModels: ["deepseek/deepseek-chat", "deepseek/deepseek-r1"],
+    agent: "glm-chat",
+    defaultModel: "z-ai/glm-5.2:free",
+    allowedModels: ["z-ai/glm-5.2:free"],
   },
   {
-    agent: "mimo-chat",
-    defaultModel: "xiaomi/mimo-v2-flash",
-    allowedModels: ["xiaomi/mimo-v2-flash"],
+    agent: "nemotron-chat",
+    defaultModel: "nvidia/nemotron-3-super-120b-a12b:free",
+    allowedModels: [
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "nvidia/nemotron-3.5-lightning:free",
+    ],
   },
   {
     agent: "budget-chat",
-    defaultModel: "deepseek/deepseek-chat",
+    defaultModel: "z-ai/glm-5.2:free",
     // undefined → whatever budgetModelSlugs() returns (env-overridable)
   },
 ];
 
 export function makeTierDLlmRoutes(opts: TierDRoutesOpts): FastifyPluginAsync {
   return async (app) => {
-    // ---------- deepseek-chat / mimo-chat / budget-chat (OpenRouter) ----------
+    // ---------- glm-chat / nemotron-chat / budget-chat (OpenRouter, free tier) ----------
     for (const listing of OPENROUTER_LISTINGS) {
       app.get(`/agents/${listing.agent}`, async () => ({
         name: listing.agent,

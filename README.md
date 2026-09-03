@@ -84,7 +84,8 @@ Every agent runs in one of three modes, reported in its response:
 
 That means the whole catalogue is runnable end-to-end with no API keys at all.
 18 of the 40 agents run for real with zero keys; the budget LLM tier
-(deepseek-chat, mimo-chat, budget-chat) needs only an OpenRouter key.
+(glm-chat, nemotron-chat, budget-chat) needs only an OpenRouter key — and every
+model behind it is free.
 
 ## Honest status
 

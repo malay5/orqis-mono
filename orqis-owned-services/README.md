@@ -99,8 +99,8 @@ end-to-end testing.
      - `ANTHROPIC_API_KEY` — flips landing-forge / resume-rx / course-quill /
        demo-forge script-gen out of mock.
      - `GEMINI_API_KEY` — flips poster-forge image-gen out of mock.
-     - `OPENROUTER_API_KEY` — flips deepseek-chat / mimo-chat / budget-chat
-       (the 2-credit budget LLM tier) out of mock. Optional
+     - `OPENROUTER_API_KEY` — flips glm-chat / nemotron-chat / budget-chat
+       (the free LLM tier) out of mock. Optional
        `OPENROUTER_BUDGET_MODELS` (comma-separated slugs) overrides the
        managed-mode allowlist without a redeploy.
      - `ELEVENLABS_API_KEY` + Remotion runtime — flips demo-forge full pipe.

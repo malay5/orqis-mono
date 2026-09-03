@@ -638,9 +638,9 @@ async function main() {
   // Budget tier (OpenRouter-backed). Each listing must fall back to its own
   // default model in mock mode and echo it back.
   for (const [slug, defaultModel] of [
-    ["deepseek-chat", "deepseek/deepseek-chat"],
-    ["mimo-chat", "xiaomi/mimo-v2-flash"],
-    ["budget-chat", "deepseek/deepseek-chat"],
+    ["glm-chat", "z-ai/glm-5.2:free"],
+    ["nemotron-chat", "nvidia/nemotron-3-super-120b-a12b:free"],
+    ["budget-chat", "z-ai/glm-5.2:free"],
   ] as const) {
     results.push(
       await run(

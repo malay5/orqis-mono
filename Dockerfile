@@ -76,9 +76,9 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 # Backend: compiled output + production deps.
-COPY --from=backend-build /build/orqis-backend/dist          ./orqis-backend/dist
-COPY --from=backend-build /build/orqis-backend/node_modules  ./orqis-backend/node_modules
-COPY --from=backend-build /build/orqis-backend/package.json  ./orqis-backend/package.json
+COPY --chown=node:node --from=backend-build /build/orqis-backend/dist          ./orqis-backend/dist
+COPY --chown=node:node --from=backend-build /build/orqis-backend/node_modules  ./orqis-backend/node_modules
+COPY --chown=node:node --from=backend-build /build/orqis-backend/package.json  ./orqis-backend/package.json
 # The seed entry point lives in src/cli/seed.ts, so it compiles into dist/
 # alongside everything else. It used to sit in scripts/ and run through tsx —
 # which does not survive `npm ci --omit=dev`, so `npm run seed` was broken in
@@ -86,16 +86,21 @@ COPY --from=backend-build /build/orqis-backend/package.json  ./orqis-backend/pac
 
 # Frontend: the standalone server, plus the two things standalone does NOT
 # include — static assets and public/.
-COPY --from=frontend-build /build/orqis-frontend/.next/standalone/          ./
-COPY --from=frontend-build /build/orqis-frontend/.next/static               ./orqis-frontend/.next/static
-COPY --from=frontend-build /build/orqis-frontend/public                     ./orqis-frontend/public
+COPY --chown=node:node --from=frontend-build /build/orqis-frontend/.next/standalone/          ./
+COPY --chown=node:node --from=frontend-build /build/orqis-frontend/.next/static               ./orqis-frontend/.next/static
+COPY --chown=node:node --from=frontend-build /build/orqis-frontend/public                     ./orqis-frontend/public
 
-COPY docker/start.js ./docker/start.js
+COPY --chown=node:node docker/start.js ./docker/start.js
 
 # Artifact scratch space for file-emitting agents. Ephemeral by nature —
 # every redeploy wipes it, which is why R2 is on the roadmap.
+#
+# Ownership is set with COPY --chown above rather than a trailing
+# `chown -R node:node /app`. That recursive chown rewrites metadata for every
+# file under node_modules into a fresh layer — roughly doubling the image, and
+# heavy enough here that BuildKit dropped its connection on the final step.
 RUN mkdir -p /app/orqis-backend/storage/r \
- && chown -R node:node /app
+ && chown node:node /app/orqis-backend/storage/r
 
 USER node
 EXPOSE 3000

@@ -1,9 +1,11 @@
 /**
- * Live smoke test for the budget LLM tier (deepseek-chat / mimo-chat /
+ * Live smoke test for the free LLM tier (glm-chat / nemotron-chat /
  * budget-chat) against the real OpenRouter API.
  *
  * Unlike scripts/smoke-tier-a-b.ts — which runs everything in mock mode and
- * spends nothing — this script makes real, billable calls. It is deliberately
+ * spends nothing — this script talks to the real OpenRouter API. The models
+ * are free, so the calls cost nothing, but they are real network calls and
+ * count against the account rate limit. Deliberately
  * a separate entry point so `npm run typecheck` + the normal smoke run stay
  * free and offline.
  *
@@ -14,7 +16,7 @@
  *      This is the "verify slugs before going live" check from
  *      apps-script-setup/sprint-18-budget-llms.md.
  *   2. LIVE CALLS — one tiny completion per listing via app.inject (no port
- *      opened), capped at 64 output tokens. Costs a fraction of a cent.
+ *      opened), capped at 64 output tokens. Free models, so $0.
  *   3. GUARD-RAILS — confirm the managed-mode allowlist and slug regex still
  *      reject bad input while a real key is present (mock mode can hide this).
  *
@@ -143,9 +145,11 @@ async function phaseCatalogue(apiKey: string): Promise<void> {
     const inp = perMillion(pricing.prompt);
     const out = perMillion(pricing.completion);
     const promptCost = Number(pricing.prompt) * 1_000_000;
-    const budgetBand = !Number.isFinite(promptCost) || promptCost <= 1;
+    // This tier is free-only: anything with a nonzero prompt price has either
+    // moved off the free plan or was added by mistake.
+    const budgetBand = promptCost === 0;
     if (budgetBand) pass(slug, `in ${inp}/M · out ${out}/M`);
-    else fail(slug, `in ${inp}/M · out ${out}/M`, "above the $1/M input budget band — reprice or drop it");
+    else fail(slug, `in ${inp}/M · out ${out}/M`, "not free any more — this tier is zero-cost only");
   }
 }
 
@@ -153,9 +157,9 @@ async function phaseLiveCalls(app: FastifyInstance): Promise<void> {
   console.log(`\n${YELLOW}2. Live calls — one tiny completion per listing${RESET}\n`);
 
   const listings = [
-    { slug: "deepseek-chat", expect: "deepseek/deepseek-chat" },
-    { slug: "mimo-chat", expect: "xiaomi/mimo-v2-flash" },
-    { slug: "budget-chat", expect: "deepseek/deepseek-chat" },
+    { slug: "glm-chat", expect: "z-ai/glm-5.2:free" },
+    { slug: "nemotron-chat", expect: "nvidia/nemotron-3-super-120b-a12b:free" },
+    { slug: "budget-chat", expect: "z-ai/glm-5.2:free" },
   ] as const;
 
   let totalCost = 0;
@@ -220,7 +224,7 @@ async function phaseGuardRails(app: FastifyInstance): Promise<void> {
     {
       name: "rejects off-allowlist model",
       payload: { messages: [{ role: "user", content: "hi" }], model: "openai/gpt-4o" },
-      slug: "mimo-chat",
+      slug: "nemotron-chat",
     },
     {
       name: "rejects empty messages",

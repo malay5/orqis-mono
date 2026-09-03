@@ -2797,22 +2797,22 @@ export const SEED_AGENTS: SeedAgent[] = [
   // ---------------------------------------------------------------------
 
   // ---------------------------------------------------------------------
-  // deepseek-chat — DeepSeek V3 / R1 via OpenRouter.
+  // glm-chat — GLM 5.2 (free) via OpenRouter.
   // ---------------------------------------------------------------------
   {
-    slug: "deepseek-chat",
-    name: "deepseek-chat",
-    tagline: "DeepSeek V3 chat completion at 2 credits — the cheap default for high-volume work.",
+    slug: "glm-chat",
+    name: "glm-chat",
+    tagline: "GLM 5.2 chat completion on a free model — 256K context, 1 credit.",
     description:
-      "Chat completion on DeepSeek V3 (default) or DeepSeek R1 for reasoning, routed through OpenRouter. Same `messages[]` shape as gpt-chat. 2 credits managed, 1 credit with your own OpenRouter key.",
+      "Chat completion on GLM 5.2, a zero-cost model routed through OpenRouter. 256K context window. Same `messages[]` shape as gpt-chat. 1 credit managed or BYO key.",
     longDescription:
-      "deepseek-chat is the budget entry point for callers who need a lot of tokens and don't need a frontier model: summarising scraped pages, classifying tickets, drafting first passes, running eval loops. DeepSeek V3 is roughly 10× cheaper per token than GPT-4o with comparable quality on everyday tasks.\n\n**Modes:**\n• **Managed** — set `OPENROUTER_API_KEY` on the orqis-owned-services host. Buyers pay 2 credits per call. Allowed models: `deepseek/deepseek-chat` (default), `deepseek/deepseek-r1`.\n• **BYO key** — pass your own OpenRouter `apiKey` (`sk-or-v1-…`). 1-credit routing fee, any OpenRouter model id accepted. Your key is never logged or stored.\n• **Mock** — neither set → canned echo response.\n\nThe response includes `usage.costUsd` (OpenRouter reports actual spend per call) so you can see exactly what a request cost upstream.\n\nManaged mode caps `maxTokens` at 4096. Non-streaming.",
+      "glm-chat is the free-tier entry point for callers who need a lot of tokens: summarising scraped pages, classifying tickets, drafting first passes, running eval loops. GLM 5.2 has a 256K context window and costs nothing per token on OpenRouter's free tier.\n\n**Modes:**\n• **Managed** — set `OPENROUTER_API_KEY` on the host. Buyers pay 1 credit per call; the upstream model is free, so the credit covers routing only.\n• **BYO key** — pass your own OpenRouter `apiKey` (`sk-or-v1-…`) to reach any OpenRouter model, paid ones included. Your key is never logged or stored.\n• **Mock** — neither set → canned echo, refunded to 0 credits.\n\nThe response includes `usage.costUsd`, which reads $0 on free models.\n\nManaged mode caps `maxTokens` at 2048 — free models are rate-limited per OpenRouter account, so long generations can exhaust the shared quota. Non-streaming.",
     category: "LLM",
-    tags: ["deepseek", "openrouter", "llm", "chat-completion", "budget", "byok"],
-    iconEmoji: "🐳",
+    tags: ["glm", "openrouter", "llm", "chat-completion", "free", "byok"],
+    iconEmoji: "🧩",
     accentHex: "#2563eb",
-    screenshots: ["Single-turn", "R1 reasoning mode", "BYO key mode"],
-    pricePerCall: 2,
+    screenshots: ["Single-turn", "Long-context", "BYO key mode"],
+    pricePerCall: 1,
     isAsync: false,
     inputSchema: {
       type: "object",
@@ -2833,8 +2833,8 @@ export const SEED_AGENTS: SeedAgent[] = [
         },
         model: {
           type: "string",
-          default: "deepseek/deepseek-chat",
-          description: "OpenRouter slug. Managed mode allows deepseek/deepseek-chat or deepseek/deepseek-r1; BYO mode accepts any.",
+          default: "z-ai/glm-5.2:free",
+          description: "OpenRouter slug. Managed mode allows z-ai/glm-5.2:free; BYO mode accepts any.",
         },
         maxTokens: { type: "integer", minimum: 1, maximum: 8192, default: 1024 },
         temperature: { type: "number", minimum: 0, maximum: 2, default: 1 },
@@ -2866,7 +2866,7 @@ export const SEED_AGENTS: SeedAgent[] = [
     },
     exampleResponse: {
       text: "billing",
-      model: "deepseek/deepseek-chat",
+      model: "z-ai/glm-5.2:free",
       mode: "managed",
       finishReason: "stop",
       usage: { inputTokens: 31, outputTokens: 2, costUsd: 0.000012 },
@@ -2875,26 +2875,26 @@ export const SEED_AGENTS: SeedAgent[] = [
     ratingAverage: 0,
     ratingCount: 0,
     invocationCount: 0,
-    endpointUrl: "http://localhost:4000/v1/agents/deepseek-chat/run",
+    endpointUrl: "http://localhost:4000/v1/agents/glm-chat/run",
   },
 
   // ---------------------------------------------------------------------
-  // mimo-chat — Xiaomi MiMo V2 Flash via OpenRouter.
+  // nemotron-chat — NVIDIA Nemotron 3 (free) via OpenRouter.
   // ---------------------------------------------------------------------
   {
-    slug: "mimo-chat",
-    name: "mimo-chat",
-    tagline: "Xiaomi MiMo V2 Flash — fast, very cheap chat completion for latency-sensitive calls.",
+    slug: "nemotron-chat",
+    name: "nemotron-chat",
+    tagline: "NVIDIA Nemotron 3 — a free 120B model with a 262K context window.",
     description:
-      "Chat completion on Xiaomi's MiMo V2 Flash via OpenRouter. Small-footprint MoE model tuned for speed; well suited to agent inner loops, autocomplete, and high-QPS classification. 2 credits managed, 1 with your own key.",
+      "Chat completion on NVIDIA Nemotron 3 Super (120B) via OpenRouter, with Nemotron 3.5 Lightning for latency-sensitive calls. Both are zero-cost models. 1 credit managed or BYO key.",
     longDescription:
-      "mimo-chat wraps Xiaomi's MiMo V2 Flash — a sparse mixture-of-experts model that trades a little frontier quality for much lower latency and cost. Use it where you'd otherwise reach for a `-mini` / `-flash` model: routing decisions inside an agent loop, tagging, rewriting, quick Q&A over short context.\n\n**Modes:**\n• **Managed** — set `OPENROUTER_API_KEY` on the orqis-owned-services host. Buyers pay 2 credits per call. Allowed model: `xiaomi/mimo-v2-flash`.\n• **BYO key** — pass your own OpenRouter `apiKey`. 1-credit routing fee, any model id accepted.\n• **Mock** — neither set → canned echo response.\n\nResponse includes `usage.costUsd` from OpenRouter. Managed mode caps `maxTokens` at 4096. Non-streaming.",
+      "nemotron-chat wraps NVIDIA's Nemotron 3 family. The default, Nemotron 3 Super 120B-A12B, is a sparse mixture-of-experts model with a 262K context window; pass `nvidia/nemotron-3.5-lightning:free` when you want speed over depth — it carries a 1M context window and answers faster. Both cost nothing per token.\n\nUse it where you'd reach for a `-mini` / `-flash` model: routing decisions inside an agent loop, tagging, rewriting, quick Q&A.\n\n**Modes:**\n• **Managed** — set `OPENROUTER_API_KEY` on the host. 1 credit per call. Allowed: `nvidia/nemotron-3-super-120b-a12b:free` (default), `nvidia/nemotron-3.5-lightning:free`.\n• **BYO key** — pass your own OpenRouter `apiKey`; 1-credit routing fee, any model id accepted.\n• **Mock** — neither set → canned echo, refunded to 0 credits.\n\nResponse includes `usage.costUsd`, which reads $0 on free models. Managed mode caps `maxTokens` at 2048 — free models share a per-account rate limit. Non-streaming.",
     category: "LLM",
-    tags: ["mimo", "xiaomi", "openrouter", "llm", "chat-completion", "budget", "byok", "fast"],
+    tags: ["nemotron", "nvidia", "openrouter", "llm", "chat-completion", "free", "byok", "fast"],
     iconEmoji: "⚡",
     accentHex: "#f97316",
-    screenshots: ["Single-turn", "Agent-loop routing", "BYO key mode"],
-    pricePerCall: 2,
+    screenshots: ["Single-turn", "Agent-loop routing", "Lightning mode"],
+    pricePerCall: 1,
     isAsync: false,
     inputSchema: {
       type: "object",
@@ -2913,7 +2913,7 @@ export const SEED_AGENTS: SeedAgent[] = [
             },
           },
         },
-        model: { type: "string", default: "xiaomi/mimo-v2-flash" },
+        model: { type: "string", default: "nvidia/nemotron-3-super-120b-a12b:free" },
         maxTokens: { type: "integer", minimum: 1, maximum: 8192, default: 1024 },
         temperature: { type: "number", minimum: 0, maximum: 2, default: 1 },
         apiKey: { type: "string", description: "BYO OpenRouter key. When set, routing fee is 1 credit and any model is allowed." },
@@ -2947,7 +2947,7 @@ export const SEED_AGENTS: SeedAgent[] = [
     },
     exampleResponse: {
       text: "cancel",
-      model: "xiaomi/mimo-v2-flash",
+      model: "nvidia/nemotron-3-super-120b-a12b:free",
       mode: "managed",
       finishReason: "stop",
       usage: { inputTokens: 26, outputTokens: 1, costUsd: 0.000003 },
@@ -2956,7 +2956,7 @@ export const SEED_AGENTS: SeedAgent[] = [
     ratingAverage: 0,
     ratingCount: 0,
     invocationCount: 0,
-    endpointUrl: "http://localhost:4000/v1/agents/mimo-chat/run",
+    endpointUrl: "http://localhost:4000/v1/agents/nemotron-chat/run",
   },
 
   // ---------------------------------------------------------------------
@@ -2965,17 +2965,17 @@ export const SEED_AGENTS: SeedAgent[] = [
   {
     slug: "budget-chat",
     name: "budget-chat",
-    tagline: "One endpoint, every budget model: DeepSeek, MiMo, Qwen, Llama, Gemini Flash Lite, Kimi, GLM.",
+    tagline: "One endpoint, every free model: GLM, Nemotron, MiniMax, Gemma, Ling, Laguna.",
     description:
       "Chat completion across a curated allowlist of cheap OpenRouter models. Pass a `model` slug to pick one, or omit it for DeepSeek V3. Handy for A/B-ing cheap models without changing endpoints. 2 credits managed, 1 with your own key.",
     longDescription:
-      "budget-chat is the catch-all for the cheap tier. Instead of one listing per vendor, it exposes a single endpoint over every model orqis has vetted as low-cost, so you can switch models by changing one string.\n\n**Managed-mode allowlist** (all via OpenRouter):\n• `deepseek/deepseek-chat` (default) — DeepSeek V3\n• `deepseek/deepseek-r1` — DeepSeek R1, reasoning\n• `xiaomi/mimo-v2-flash` — MiMo V2 Flash\n• `qwen/qwen3-30b-a3b` — Qwen3 30B-A3B\n• `meta-llama/llama-3.3-70b-instruct` — Llama 3.3 70B\n• `google/gemini-2.5-flash-lite` — Gemini 2.5 Flash Lite\n• `moonshotai/kimi-k2` — Kimi K2\n• `z-ai/glm-4.5-air` — GLM 4.5 Air\n\n`GET /v1/agents/budget-chat` on the owned-services host returns the live allowlist plus approximate per-token pricing, so you don't have to hard-code this list.\n\n**Modes:**\n• **Managed** — `OPENROUTER_API_KEY` set on the host; 2 credits per call; allowlisted models only (requests for anything else get a 400 with the allowlist in the message).\n• **BYO key** — pass your own OpenRouter `apiKey`; 1-credit routing fee; any OpenRouter model id accepted, including `:free` variants.\n• **Mock** — canned echo.\n\nResponse includes `usage.costUsd`. Managed mode caps `maxTokens` at 4096. Non-streaming.",
+      "budget-chat is the catch-all for the free tier. Instead of one listing per vendor, it exposes a single endpoint over every zero-cost model orqis has vetted, so you switch models by changing one string.\n\n**Managed-mode allowlist** (all free on OpenRouter):\n• `z-ai/glm-5.2:free` (default) — GLM 5.2, 256K context\n• `nvidia/nemotron-3-super-120b-a12b:free` — Nemotron 3 Super 120B\n• `nvidia/nemotron-3.5-lightning:free` — Nemotron 3.5 Lightning, 1M context\n• `minimax/minimax-m2.7:free` — MiniMax M2.7\n• `google/gemma-4-31b-it:free` — Gemma 4 31B\n• `inclusionai/ling-3.0-flash-fin:free` — Ling 3.0 Flash\n• `poolside/laguna-s-2.1:free` — Laguna S 2.1\n• `cohere/north-mini-code:free` — North Mini Code\n\n`GET /v1/agents/budget-chat` returns the live allowlist, so you don't have to hard-code this.\n\n**Modes:**\n• **Managed** — `OPENROUTER_API_KEY` set on the host; 1 credit per call; allowlisted models only (anything else gets a 400 naming the allowlist).\n• **BYO key** — pass your own OpenRouter `apiKey`; 1-credit routing fee; any model id accepted, paid models included.\n• **Mock** — canned echo, refunded to 0 credits.\n\nResponse includes `usage.costUsd`, which reads $0 on free models. Managed mode caps `maxTokens` at 2048 — free models share a per-account rate limit. Non-streaming.",
     category: "LLM",
-    tags: ["openrouter", "llm", "chat-completion", "budget", "byok", "multi-model", "deepseek", "qwen", "llama"],
+    tags: ["openrouter", "llm", "chat-completion", "free", "byok", "multi-model", "glm", "nemotron", "gemma"],
     iconEmoji: "🪙",
     accentHex: "#16a34a",
     screenshots: ["Model picker", "Cost per call", "BYO key mode"],
-    pricePerCall: 2,
+    pricePerCall: 1,
     isAsync: false,
     inputSchema: {
       type: "object",
@@ -2996,7 +2996,7 @@ export const SEED_AGENTS: SeedAgent[] = [
         },
         model: {
           type: "string",
-          default: "deepseek/deepseek-chat",
+          default: "z-ai/glm-5.2:free",
           description: "OpenRouter slug (vendor/model). Managed mode: must be on the budget allowlist. BYO mode: any.",
         },
         maxTokens: { type: "integer", minimum: 1, maximum: 8192, default: 1024 },
