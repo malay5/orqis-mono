@@ -5,23 +5,25 @@
  * service now, so the script that populates it does too.
  *
  * Usage:
- *   cd orqis-backend
- *   npm run seed
+  *   cd orqis-backend
+ *   npm run seed          # local (tsx)
+ *   npm run seed:prod     # compiled, inside the container
  *
  *   # point the catalogue at a different agent host
- *   OWNED_SERVICES_BASE_URL=https://owned-services.orqis.xyz npm run seed
+ *   OWNED_SERVICES_BASE_URL=https://owned-services.orqis.xyz npm run seed          # local (tsx)
+ *   npm run seed:prod     # compiled, inside the container
  *
  * Idempotent — safe to re-run. Updates documents in place rather than
  * deleting and re-inserting, so reviews and invocation counts on a seeded
  * agent survive a re-seed.
  */
 
-import "../src/platform/load-env.js";
+import "../platform/load-env.js";
 import mongoose from "mongoose";
-import { connectMongoose } from "../src/db/mongoose.js";
-import { AgentModel } from "../src/models/Agent.js";
-import { SEED_AGENTS } from "../src/data/seed-agents.js";
-import { resolveSeedEndpoint } from "../src/platform/seed-endpoint.js";
+import { connectMongoose } from "../db/mongoose.js";
+import { AgentModel } from "../models/Agent.js";
+import { SEED_AGENTS } from "../data/seed-agents.js";
+import { resolveSeedEndpoint } from "../platform/seed-endpoint.js";
 
 async function main(): Promise<void> {
   await connectMongoose();

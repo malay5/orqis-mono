@@ -72,7 +72,7 @@ Memory: **1 GB minimum**, 2 GB comfortable. Two Node processes plus sharp.
 Once it's running, from a shell in the container:
 
 ```bash
-cd orqis-backend && npm run seed
+cd orqis-backend && npm run seed:prod
 ```
 
 This writes all 40 agents and points each `endpointUrl` at

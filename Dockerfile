@@ -79,9 +79,10 @@ WORKDIR /app
 COPY --from=backend-build /build/orqis-backend/dist          ./orqis-backend/dist
 COPY --from=backend-build /build/orqis-backend/node_modules  ./orqis-backend/node_modules
 COPY --from=backend-build /build/orqis-backend/package.json  ./orqis-backend/package.json
-# Seed data + the seed script, so `npm run seed` works from a shell in the
-# running container.
-COPY --from=backend-build /build/orqis-backend/scripts       ./orqis-backend/scripts
+# The seed entry point lives in src/cli/seed.ts, so it compiles into dist/
+# alongside everything else. It used to sit in scripts/ and run through tsx —
+# which does not survive `npm ci --omit=dev`, so `npm run seed` was broken in
+# the image. Run it here with: npm run seed:prod
 
 # Frontend: the standalone server, plus the two things standalone does NOT
 # include — static assets and public/.
