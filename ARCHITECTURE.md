@@ -2,6 +2,12 @@
 
 Last updated: 2026-09-03 (Sprint 19 decoupling, Sprint 20 auth rewrite + SEO).
 
+## Repository layout
+
+One monorepo, six folders. `orqis-frontend` and `orqis-backend` were separate
+repos until Sprint 21; their pre-monorepo history lives in the archived
+`malay5/orqis---agentic-shop` and `malay5/orqis-backend`.
+
 ## Three services
 
 ```
@@ -120,6 +126,18 @@ SoftwareApplication on agent pages.
 Two rules worth keeping: social platforms reject SVG, so any OG image must be
 a real PNG; and `NEXT_PUBLIC_SITE_URL` drives `metadataBase`, the sitemap and
 robots together, so a domain change is one variable.
+
+## Deployment shape
+
+The root `Dockerfile` builds frontend and backend into **one image**: Fastify
+on loopback:4000, Next.js on `$PORT` as the only published port,
+`docker/start.js` supervising both. That works because the frontend already
+proxies every backend call through its own route handlers — the browser never
+needs to reach Fastify directly. See DEPLOY.md.
+
+Splitting later costs no code changes: point `ORQIS_API_URL` at a separately
+deployed backend and the frontend stops caring that they ever shared a
+process.
 
 ## Local development
 
