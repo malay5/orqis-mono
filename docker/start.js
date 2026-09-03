@@ -73,8 +73,15 @@ for (const signal of ["SIGTERM", "SIGINT"]) {
   });
 }
 
-/** Poll the backend's health endpoint until it answers or we give up. */
-async function waitForBackend(timeoutMs = 60_000) {
+/**
+ * Poll the backend's health endpoint until it answers or we give up.
+ *
+ * 150s, not 60: the backend awaits its Mongo connection inside buildApp before
+ * it starts listening, and a cold Atlas M0 cluster can exceed a minute on the
+ * first connection after idling. A too-short window here kills a container
+ * that would have come up fine.
+ */
+async function waitForBackend(timeoutMs = 150_000) {
   const url = `http://${BACKEND_HOST}:${BACKEND_PORT}/health`;
   const deadline = Date.now() + timeoutMs;
 
@@ -103,7 +110,16 @@ async function main() {
   if (!ready) {
     // Usually a bad MONGODB_URI or a missing AUTH_SECRET — the backend
     // asserts both at boot and exits with a readable message above this line.
-    log("supervisor", "backend never became healthy — check MONGODB_URI and AUTH_SECRET");
+    log(
+      "supervisor",
+      "backend never became healthy. If nothing was logged above, it is still
+" +
+        "  inside the initial database connection — a cold Atlas cluster can take
+" +
+        "  over a minute on its first connection. Otherwise check MONGODB_URI and
+" +
+        "  AUTH_SECRET; the backend asserts both at boot."
+    );
     shutdown(1);
     return;
   }
