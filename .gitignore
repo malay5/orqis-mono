@@ -10,12 +10,13 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment — never commit real values. .env.example files are tracked.
-.env
-.env.local
-.env.*.local
-.env.production
+# Environment — never commit real values.
+# Deny every .env* variant, then allow back only the documented templates.
+# The previous explicit list (.env, .env.local, .env.production) missed
+# anything else — .env.deploy, .env.staging, .env.backup all slipped through.
+.env*
 !.env.example
+!.env*.example
 
 # Agent artifact scratch space (ephemeral by design)
 orqis-backend/storage/r/*
