@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { API_BASE_URL } from "@/lib/api-base";
+import { API_BASE_URL, API_BASE_URL_MISCONFIGURED, MISCONFIGURED_MESSAGE } from "@/lib/api-base";
 
 /**
  * Plain token auth (Sprint 20) — NextAuth removed.
@@ -78,6 +78,10 @@ export async function clearToken(): Promise<void> {
 export async function getSession(): Promise<{ user: SessionUser } | null> {
   const token = await getToken();
   if (!token) return null;
+  if (API_BASE_URL_MISCONFIGURED) {
+    console.error("[session] " + MISCONFIGURED_MESSAGE);
+    return null;
+  }
 
   try {
     const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {

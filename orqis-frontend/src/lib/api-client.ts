@@ -1,5 +1,9 @@
 import "server-only";
-import { API_BASE_URL } from "@/lib/api-base";
+import {
+  API_BASE_URL,
+  API_BASE_URL_MISCONFIGURED,
+  MISCONFIGURED_MESSAGE,
+} from "@/lib/api-base";
 import { getToken } from "@/lib/session";
 
 export { API_BASE_URL };
@@ -43,6 +47,9 @@ type FetchOptions = {
 };
 
 export async function apiFetch<T>(path: string, opts: FetchOptions = {}): Promise<T> {
+  // Surface a missing ORQIS_API_URL as itself, not as ECONNREFUSED on loopback.
+  if (API_BASE_URL_MISCONFIGURED) throw new ApiError(500, MISCONFIGURED_MESSAGE);
+
   const headers: Record<string, string> = { "Content-Type": "application/json" };
 
   if (opts.token) {
@@ -117,6 +124,11 @@ export async function proxyToBackend(
   path: string,
   init: { method?: string; body?: BodyInit | null } = {}
 ): Promise<Response> {
+  if (API_BASE_URL_MISCONFIGURED) {
+    console.error("[api-client] " + MISCONFIGURED_MESSAGE);
+    return Response.json({ error: MISCONFIGURED_MESSAGE }, { status: 500 });
+  }
+
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const auth = req.headers.get("authorization");
   if (auth) {
