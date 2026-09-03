@@ -49,19 +49,29 @@ const OPENROUTER_LISTINGS: readonly OpenRouterListing[] = [
   {
     agent: "glm-chat",
     defaultModel: "z-ai/glm-5.2:free",
-    allowedModels: ["z-ai/glm-5.2:free"],
-  },
-  {
-    agent: "nemotron-chat",
-    defaultModel: "nvidia/nemotron-3-super-120b-a12b:free",
+    // GLM first, then two reliable stand-ins. Free models 429 constantly, and
+    // an agent that errors half the time is worse than one that occasionally
+    // answers on a sibling model — the response reports which one served.
     allowedModels: [
-      "nvidia/nemotron-3-super-120b-a12b:free",
+      "z-ai/glm-5.2:free",
+      "minimax/minimax-m2.7:free",
       "nvidia/nemotron-3.5-lightning:free",
     ],
   },
   {
+    agent: "nemotron-chat",
+    defaultModel: "nvidia/nemotron-3.5-lightning:free",
+    allowedModels: [
+      "nvidia/nemotron-3.5-lightning:free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
+    ],
+  },
+  {
     agent: "budget-chat",
-    defaultModel: "z-ai/glm-5.2:free",
+    // Nemotron, not GLM: GLM 5.2:free is the most heavily used free model on
+    // OpenRouter and 429s often. The generic listing should default to
+    // whichever free model answers most reliably.
+    defaultModel: "nvidia/nemotron-3.5-lightning:free",
     // undefined → whatever budgetModelSlugs() returns (env-overridable)
   },
 ];

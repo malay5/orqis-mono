@@ -2969,7 +2969,7 @@ export const SEED_AGENTS: SeedAgent[] = [
     description:
       "Chat completion across a curated allowlist of cheap OpenRouter models. Pass a `model` slug to pick one, or omit it for DeepSeek V3. Handy for A/B-ing cheap models without changing endpoints. 2 credits managed, 1 with your own key.",
     longDescription:
-      "budget-chat is the catch-all for the free tier. Instead of one listing per vendor, it exposes a single endpoint over every zero-cost model orqis has vetted, so you switch models by changing one string.\n\n**Managed-mode allowlist** (all free on OpenRouter):\n• `z-ai/glm-5.2:free` (default) — GLM 5.2, 256K context\n• `nvidia/nemotron-3-super-120b-a12b:free` — Nemotron 3 Super 120B\n• `nvidia/nemotron-3.5-lightning:free` — Nemotron 3.5 Lightning, 1M context\n• `minimax/minimax-m2.7:free` — MiniMax M2.7\n• `google/gemma-4-31b-it:free` — Gemma 4 31B\n• `inclusionai/ling-3.0-flash-fin:free` — Ling 3.0 Flash\n• `poolside/laguna-s-2.1:free` — Laguna S 2.1\n• `cohere/north-mini-code:free` — North Mini Code\n\n`GET /v1/agents/budget-chat` returns the live allowlist, so you don't have to hard-code this.\n\n**Modes:**\n• **Managed** — `OPENROUTER_API_KEY` set on the host; 1 credit per call; allowlisted models only (anything else gets a 400 naming the allowlist).\n• **BYO key** — pass your own OpenRouter `apiKey`; 1-credit routing fee; any model id accepted, paid models included.\n• **Mock** — canned echo, refunded to 0 credits.\n\nResponse includes `usage.costUsd`, which reads $0 on free models. Managed mode caps `maxTokens` at 2048 — free models share a per-account rate limit. Non-streaming.",
+      "budget-chat is the catch-all for the free tier. Instead of one listing per vendor, it exposes a single endpoint over every zero-cost model orqis has vetted, so you switch models by changing one string.\n\n**Managed-mode allowlist** (all free on OpenRouter):\n• `z-ai/glm-5.2:free` — GLM 5.2, 256K context\n• `nvidia/nemotron-3-super-120b-a12b:free` (default) — Nemotron 3 Super 120B\n• `nvidia/nemotron-3.5-lightning:free` — Nemotron 3.5 Lightning, 1M context\n• `minimax/minimax-m2.7:free` — MiniMax M2.7\n• `google/gemma-4-31b-it:free` — Gemma 4 31B\n• `inclusionai/ling-3.0-flash-fin:free` — Ling 3.0 Flash\n• `poolside/laguna-s-2.1:free` — Laguna S 2.1\n• `cohere/north-mini-code:free` — North Mini Code\n\n`GET /v1/agents/budget-chat` returns the live allowlist, so you don't have to hard-code this.\n\n**Modes:**\n• **Managed** — `OPENROUTER_API_KEY` set on the host; 1 credit per call; allowlisted models only (anything else gets a 400 naming the allowlist).\n• **BYO key** — pass your own OpenRouter `apiKey`; 1-credit routing fee; any model id accepted, paid models included.\n• **Mock** — canned echo, refunded to 0 credits.\n\nResponse includes `usage.costUsd`, which reads $0 on free models. Managed mode caps `maxTokens` at 2048 — free models share a per-account rate limit. Non-streaming.",
     category: "LLM",
     tags: ["openrouter", "llm", "chat-completion", "free", "byok", "multi-model", "glm", "nemotron", "gemma"],
     iconEmoji: "🪙",
@@ -2996,7 +2996,7 @@ export const SEED_AGENTS: SeedAgent[] = [
         },
         model: {
           type: "string",
-          default: "z-ai/glm-5.2:free",
+          default: "nvidia/nemotron-3-super-120b-a12b:free",
           description: "OpenRouter slug (vendor/model). Managed mode: must be on the budget allowlist. BYO mode: any.",
         },
         maxTokens: { type: "integer", minimum: 1, maximum: 8192, default: 1024 },

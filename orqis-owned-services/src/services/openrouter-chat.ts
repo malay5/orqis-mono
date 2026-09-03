@@ -76,13 +76,15 @@ export type BudgetModel = {
  * without a redeploy.
  */
 export const BUDGET_MODELS: readonly BudgetModel[] = [
-  { slug: "z-ai/glm-5.2:free", label: "GLM 5.2", vendor: "Z.ai", contextTokens: 256_000 },
-  { slug: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super 120B", vendor: "NVIDIA", contextTokens: 262_144 },
+  // Ordered by observed availability on 2026-09-03 — the fallback chain walks
+  // this list in order, so the ones that actually answer come first.
   { slug: "nvidia/nemotron-3.5-lightning:free", label: "Nemotron 3.5 Lightning", vendor: "NVIDIA", contextTokens: 1_000_000 },
   { slug: "minimax/minimax-m2.7:free", label: "MiniMax M2.7", vendor: "MiniMax", contextTokens: 196_608 },
+  { slug: "poolside/laguna-s-2.1:free", label: "Laguna S 2.1", vendor: "Poolside", contextTokens: 262_144 },
+  { slug: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super 120B", vendor: "NVIDIA", contextTokens: 262_144 },
+  { slug: "z-ai/glm-5.2:free", label: "GLM 5.2", vendor: "Z.ai", contextTokens: 256_000 },
   { slug: "google/gemma-4-31b-it:free", label: "Gemma 4 31B", vendor: "Google", contextTokens: 262_144 },
   { slug: "inclusionai/ling-3.0-flash-fin:free", label: "Ling 3.0 Flash", vendor: "InclusionAI", contextTokens: 262_144 },
-  { slug: "poolside/laguna-s-2.1:free", label: "Laguna S 2.1", vendor: "Poolside", contextTokens: 262_144 },
   { slug: "cohere/north-mini-code:free", label: "North Mini Code", vendor: "Cohere", contextTokens: 256_000 },
 ];
 
@@ -96,6 +98,14 @@ const MODEL_RE = /^[a-z0-9-]{2,40}\/[a-zA-Z0-9._-]{2,80}(:[a-z0-9-]{1,20})?$/;
 // rate-limited per OpenRouter *account*: a handful of long generations can
 // exhaust the shared quota and 429 everyone else.
 const MANAGED_MAX_TOKENS = 2048;
+
+// Per-attempt ceiling, and how many models the fallback chain may try.
+// The invocation proxy gives the whole call 30s, so the worst case here
+// (MAX_ATTEMPTS x ATTEMPT_TIMEOUT_MS) has to stay comfortably under that or a
+// rate-limited first choice burns the budget before a working model is
+// reached. Measured: successful free-model calls return in 1.5-4s.
+const ATTEMPT_TIMEOUT_MS = 8_000;
+const MAX_ATTEMPTS = 3;
 const BYOK_MAX_TOKENS = 8192;
 
 export type OpenRouterChatMode = "byok" | "managed" | "mock";
@@ -169,6 +179,8 @@ async function runReal(
   const client = new OpenAI({
     apiKey,
     baseURL: OPENROUTER_BASE_URL,
+    timeout: ATTEMPT_TIMEOUT_MS,
+    maxRetries: 0, // the fallback chain is the retry strategy
     defaultHeaders: {
       "HTTP-Referer": "https://orqis.xyz",
       "X-Title": `orqis ${listing.agent}`,
@@ -183,10 +195,35 @@ async function runReal(
     // usage.cost, which is what buyers care about on a budget listing.
     ...({ usage: { include: true } } as Record<string, unknown>),
   });
-  const choice = res.choices[0];
+  // OpenRouter reports upstream provider failures as HTTP 200 with an `error`
+  // field in the body, not as an HTTP error status — so the OpenAI SDK never
+  // throws. Left unchecked, a rate-limited free model returns an empty string
+  // that looks like a successful call, and the buyer is charged for nothing.
+  // Throwing here surfaces it as a 502, which the invocation proxy refunds.
+  const upstreamError = (res as unknown as { error?: { message?: string; code?: number } }).error;
+  if (upstreamError) {
+    throw new Error(
+      `OpenRouter upstream error${upstreamError.code ? ` (${upstreamError.code})` : ""}: ` +
+        `${upstreamError.message ?? "unknown"}. Model: ${model}.`
+    );
+  }
+
+  const choice = res.choices?.[0];
+  const content = choice?.message?.content ?? "";
+  if (!content) {
+    // No content and no error field. Most often a free model that hit its
+    // per-account rate limit, or one whose entire token budget went to
+    // reasoning. Either way the buyer got nothing, so don't bill for it.
+    throw new Error(
+      `OpenRouter returned an empty completion for ${model} ` +
+        `(finish_reason: ${choice?.finish_reason ?? "none"}). ` +
+        "Free models are rate-limited per account — retry shortly."
+    );
+  }
+
   const usage = res.usage as (typeof res.usage & { cost?: number }) | undefined;
   return {
-    text: choice?.message?.content ?? "",
+    text: content,
     model: res.model,
     mode,
     finishReason: choice?.finish_reason ?? null,
@@ -214,6 +251,26 @@ async function runMock(input: OpenRouterChatInput, listing: OpenRouterListing): 
   };
 }
 
+/**
+ * Candidate models to try, in order.
+ *
+ * Free models on OpenRouter are rate-limited per account and share capacity
+ * across everyone using them, so any single one 429s or 502s unpredictably —
+ * measured on 2026-09-03, only 3 of the 8 answered on a given pass, and a
+ * different 3 a minute earlier. A hard default therefore fails often enough
+ * to wreck a demo.
+ *
+ * So when the caller *didn't* pin a model we treat the listing's default as a
+ * preference, not a requirement, and fall through the rest of its allowlist.
+ * When the caller *did* pin one we honour it exactly and let it fail — asking
+ * for GLM and silently getting Nemotron would be worse than an error.
+ */
+function candidateModels(input: OpenRouterChatInput, listing: OpenRouterListing): string[] {
+  if (input.model) return [input.model];
+  const allowed = listing.allowedModels ?? budgetModelSlugs();
+  return [listing.defaultModel, ...allowed.filter((m) => m !== listing.defaultModel)];
+}
+
 export async function runOpenRouterChat(
   input: OpenRouterChatInput,
   listing: OpenRouterListing
@@ -221,7 +278,26 @@ export async function runOpenRouterChat(
   const mode = detectMode(input);
   if (mode === "mock") return runMock(input, listing);
   const apiKey = mode === "byok" ? input.apiKey!.trim() : process.env.OPENROUTER_API_KEY!;
-  return runReal(input, listing, apiKey, mode);
+
+  const candidates = candidateModels(input, listing).slice(0, MAX_ATTEMPTS);
+  let lastError: unknown;
+
+  for (const model of candidates) {
+    try {
+      return await runReal({ ...input, model }, listing, apiKey, mode);
+    } catch (err) {
+      // A ValidationError means the request itself is wrong — a bad role, an
+      // off-allowlist model. Retrying a different model would turn a clear
+      // 400 into a confusing one, so stop immediately.
+      if (err instanceof ValidationError) throw err;
+      lastError = err;
+    }
+  }
+
+  throw new Error(
+    `All ${candidates.length} model(s) failed for ${listing.agent}. ` +
+      `Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+  );
 }
 
 function clamp(n: unknown, lo: number, hi: number): number {
