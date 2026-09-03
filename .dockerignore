@@ -1,0 +1,26 @@
+# Never copy installed deps or build output into the image — every stage
+# installs its own, and copying host artifacts breaks native modules built
+# for a different platform (sharp, in particular).
+**/node_modules
+**/.next
+**/dist
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local-only
+**/storage/r/*
+**/*.log
+**/.DS_Store
+**/coverage
+**/.turbo
+orqis-frontend/.next
+docker-compose.override.yml
+
+# Not needed at build or runtime
+**/*.md
+!README.md
+apps-script-setup/
+launch-assets/
+tests/

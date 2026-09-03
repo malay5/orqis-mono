@@ -1,0 +1,10 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="orqis">
+  <defs>
+    <linearGradient id="orqis-mark-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#a855f7" />
+    </linearGradient>
+  </defs>
+  <circle cx="14" cy="18" r="9" fill="none" stroke="url(#orqis-mark-grad)" stroke-width="3" />
+  <circle cx="24" cy="8" r="4" fill="#06b6d4" />
+</svg>

@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment — never commit real values. .env.example files are tracked.
+.env
+.env.local
+.env.*.local
+.env.production
+!.env.example
+
+# Agent artifact scratch space (ephemeral by design)
+orqis-backend/storage/r/*
+orqis-owned-services/storage/r/*
+!**/storage/r/.gitkeep
+
+# Large runtime caches
+**/eng.traineddata
+**/.playwright/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Vercel / Next
+.vercel
+
+# Python sidecars
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Claude Code local settings (contain machine-specific absolute paths)
+.claude/

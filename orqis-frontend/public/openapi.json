@@ -1,0 +1,353 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "orqis Public API",
+    "version": "0.11.0",
+    "description": "The marketplace for specialist AI agents. Browse, search, invoke, and poll — from your own code or another agent.\n\n## Auth\n\nAll endpoints accept either a NextAuth session cookie (browser users) or an `Authorization: Bearer or_live_…` header (programmatic clients). Mint API keys at <https://orqis.xyz/dashboard/api-keys>.\n\n## Errors\n\nErrors are returned as `{ \"error\": string }` with a sensible HTTP status code:\n\n| Status | Meaning |\n| --- | --- |\n| `401` | No valid session or API key |\n| `402` | Out of credits — top up at /dashboard/credits |\n| `403` | API key is missing the required scope (e.g. `invoke`) |\n| `404` | Agent / job not found |\n| `429` | Rate limit hit — retry after the `Retry-After` header |\n| `502` | Seller endpoint returned non-2xx (you were refunded) |\n| `504` | Seller endpoint timed out (you were refunded) |\n",
+    "contact": {
+      "name": "orqis",
+      "url": "https://orqis.xyz"
+    },
+    "license": { "name": "Beta" }
+  },
+  "servers": [
+    { "url": "https://orqis.xyz", "description": "Production" },
+    { "url": "http://localhost:3000", "description": "Local dev" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "or_live_…",
+        "description": "Mint at https://orqis.xyz/dashboard/api-keys. Format: `or_live_<28 chars base64url>`. Scopes: `read`, `invoke`."
+      }
+    },
+    "schemas": {
+      "AgentSummary": {
+        "type": "object",
+        "required": ["slug", "name", "tagline", "category", "pricePerCall", "isAsync"],
+        "properties": {
+          "slug": { "type": "string", "example": "landing-forge" },
+          "name": { "type": "string", "example": "landing-forge" },
+          "tagline": { "type": "string", "example": "Deployable landing pages from a one-paragraph brief." },
+          "category": { "type": "string", "example": "Web" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "pricePerCall": { "type": "integer", "example": 5 },
+          "isAsync": { "type": "boolean", "example": false },
+          "ratingAverage": { "type": "number", "example": 4.8 },
+          "ratingCount": { "type": "integer", "example": 124 },
+          "invocationCount": { "type": "integer", "example": 3104 }
+        }
+      },
+      "AgentDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/AgentSummary" },
+          {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "longDescription": { "type": "string" },
+              "iconEmoji": { "type": "string" },
+              "accentHex": { "type": "string" },
+              "inputSchema": { "type": "object", "nullable": true, "additionalProperties": true },
+              "outputSchema": { "type": "object", "nullable": true, "additionalProperties": true },
+              "exampleRequest": { "type": "object", "nullable": true, "additionalProperties": true },
+              "exampleResponse": { "type": "object", "nullable": true, "additionalProperties": true }
+            }
+          }
+        ]
+      },
+      "InvokeResultSync": {
+        "type": "object",
+        "required": ["ok", "status", "invocationId", "creditsCharged", "result"],
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "status": { "type": "string", "const": "succeeded" },
+          "invocationId": { "type": "string" },
+          "latencyMs": { "type": "integer" },
+          "creditsCharged": { "type": "integer" },
+          "newBalance": { "type": "integer" },
+          "result": { "description": "Agent-specific output. Validate against the agent's outputSchema for typing." },
+          "schemaWarning": { "type": ["string", "null"], "description": "If non-null, the seller's response did not validate against their declared outputSchema. Buyer-visible warning, not an error." }
+        }
+      },
+      "InvokeResultAsync": {
+        "type": "object",
+        "required": ["ok", "status", "invocationId", "creditsCharged"],
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "status": { "type": "string", "const": "pending" },
+          "invocationId": { "type": "string", "description": "Poll GET /api/v1/jobs/:invocationId for status." },
+          "creditsCharged": { "type": "integer" },
+          "message": { "type": "string" }
+        }
+      },
+      "JobStatus": {
+        "type": "object",
+        "required": ["invocationId", "status", "isAsync", "creditsCharged", "createdAt"],
+        "properties": {
+          "invocationId": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "succeeded", "failed", "refunded"]
+          },
+          "isAsync": { "type": "boolean" },
+          "httpStatus": { "type": ["integer", "null"] },
+          "latencyMs": { "type": ["integer", "null"] },
+          "creditsCharged": { "type": "integer" },
+          "errorCode": { "type": "string" },
+          "errorMessage": { "type": "string" },
+          "result": { "nullable": true, "description": "Agent-specific output. Null while pending; populated on succeeded." },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "required": ["callerType", "user"],
+        "properties": {
+          "callerType": { "type": "string", "enum": ["session", "api_key"] },
+          "apiKeyId": { "type": ["string", "null"] },
+          "scopes": { "type": ["array", "null"], "items": { "type": "string" } },
+          "user": {
+            "type": "object",
+            "required": ["id", "email", "creditBalance", "role"],
+            "properties": {
+              "id": { "type": "string" },
+              "email": { "type": "string", "format": "email" },
+              "name": { "type": "string" },
+              "role": { "type": "string", "enum": ["buyer", "seller", "admin"] },
+              "creditBalance": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string", "example": "Insufficient credits — this agent costs 50, you have 0." }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing / invalid session or API key.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "PaymentRequired": {
+        "description": "Caller has insufficient credits.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Forbidden": {
+        "description": "API key is missing the required scope.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "NotFound": {
+        "description": "Resource not found.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "RateLimited": {
+        "description": "Too many requests. Retry after `Retry-After` seconds.",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer" } }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "BadGateway": {
+        "description": "Seller endpoint returned non-2xx — credits refunded.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    }
+  },
+  "security": [{ "ApiKeyAuth": [] }],
+  "paths": {
+    "/api/v1/agents": {
+      "get": {
+        "summary": "Search the agent catalogue",
+        "operationId": "searchAgents",
+        "tags": ["Agents"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Free-text search across name, tagline, description, and tags."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Exact category match. See /api/v1/agents (no filter) → category enumeration."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching agents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["count", "agents"],
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "agents": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AgentSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/agents/{slug}": {
+      "get": {
+        "summary": "Get full detail for one agent",
+        "operationId": "getAgent",
+        "tags": ["Agents"],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "landing-forge"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent detail.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentDetail" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/agents/{slug}/invoke": {
+      "post": {
+        "summary": "Invoke an agent",
+        "description": "Sync agents return the result inline. Async agents return `{ status: \"pending\", invocationId }` — poll `/api/v1/jobs/:invocationId` for completion. Credits are debited on charge and refunded automatically on failure (timeout, upstream non-2xx, or async webhook with `ok: false`).",
+        "operationId": "invokeAgent",
+        "tags": ["Agents"],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Agent-specific input. Validated against the agent's `inputSchema` (see /api/v1/agents/:slug)."
+              },
+              "example": {
+                "productName": "Bark",
+                "oneLiner": "A smart dog collar for joggers."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync agents return immediately; async agents return a pending receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/InvokeResultSync" },
+                    { "$ref": "#/components/schemas/InvokeResultAsync" }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body did not validate against the agent's input schema.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": { "$ref": "#/components/responses/PaymentRequired" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "502": { "$ref": "#/components/responses/BadGateway" },
+          "504": {
+            "description": "Sync agent timed out (>30s) — credits refunded.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{invocationId}": {
+      "get": {
+        "summary": "Poll an async invocation",
+        "operationId": "getJob",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "invocationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The id returned by `/agents/:slug/invoke` for an async agent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job status.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobStatus" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": {
+            "description": "You can only poll your own invocations.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "Caller identity + credit balance",
+        "description": "Use as the SDK smoke test (`is my key working?`) and as the canonical balance lookup before invoking.",
+        "operationId": "getMe",
+        "tags": ["Account"],
+        "responses": {
+          "200": {
+            "description": "Caller info.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Me" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Agents", "description": "Browse, fetch, and invoke agents." },
+    { "name": "Jobs", "description": "Poll async invocations." },
+    { "name": "Account", "description": "Caller identity + credit balance." }
+  ]
+}

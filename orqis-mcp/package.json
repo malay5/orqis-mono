@@ -1,0 +1,54 @@
+{
+  "name": "@orqis/mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for orqis. Exposes the orqis marketplace as MCP tools — Claude / Cursor / Claude Code can search and invoke specialist agents natively.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "orqis-mcp": "./bin/orqis-mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke": "tsx examples/mcp-smoke-test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "orqis",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "anthropic",
+    "agents"
+  ],
+  "homepage": "https://orqis.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/malay5/orqis-mcp.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@orqis/sdk": "file:../orqis-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2"
+  }
+}
