@@ -1,21 +1,22 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 const nextConfig: NextConfig = {
   /**
-   * Standalone output (Sprint 21) — required for the single-container build.
+   * Standalone output — required for a container build, and harmless
+   * otherwise.
    *
    * Emits `.next/standalone/` containing a self-contained server plus only
-   * the node_modules actually reached by the traced import graph. Without it
-   * the runtime image has to carry the full dependency tree, and
-   * `@scalar/api-reference-react` alone is 89 MB installed.
+   * the node_modules the traced import graph actually reaches: 31 MB rather
+   * than the full dependency tree, which includes `@scalar/api-reference-react`
+   * at 89 MB installed.
    *
-   * `outputFileTracingRoot` must point at the monorepo root: tracing starts
-   * from the nearest lockfile by default, and in a monorepo that guess is
-   * wrong often enough to silently drop files the server needs at runtime.
+   * No `outputFileTracingRoot`: tracing defaults to the nearest lockfile, and
+   * this app has its own `package-lock.json`, so the default is already
+   * correct. Pointing it at a parent directory only makes sense when several
+   * apps share one lockfile — and it is actively wrong in the standalone
+   * frontend repo, where there is no parent to point at.
    */
   output: "standalone",
-  
 };
 
 export default nextConfig;
