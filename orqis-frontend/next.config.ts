@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
    * wrong often enough to silently drop files the server needs at runtime.
    */
   output: "standalone",
-  outputFileTracingRoot: path.join(import.meta.dirname, ".."),
+  
 };
 
 export default nextConfig;
