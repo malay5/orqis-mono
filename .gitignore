@@ -50,3 +50,6 @@ venv/
 
 # Claude Code local settings (contain machine-specific absolute paths)
 .claude/
+
+# Crash artifacts
+*.stackdump

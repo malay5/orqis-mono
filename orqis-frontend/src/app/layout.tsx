@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { getSession } from "@/lib/session";
+import { WebMcpProvider } from "@/components/WebMcpProvider";
 import { SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
@@ -99,7 +100,12 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
       <body className="min-h-screen">
-        <Providers initialUser={session?.user ?? null}>{children}</Providers>
+        <Providers initialUser={session?.user ?? null}>
+          {/* Publishes orqis tools on navigator.modelContext for in-browser
+              agents. Renders nothing where WebMCP is unsupported. */}
+          <WebMcpProvider />
+          {children}
+        </Providers>
       </body>
     </html>
   );

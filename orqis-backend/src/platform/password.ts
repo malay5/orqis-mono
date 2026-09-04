@@ -1,37 +1,36 @@
+import bcrypt from "bcryptjs";
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 /**
- * Password hashing for orqis's own email + password auth (replaced Google
- * OAuth in Sprint 19).
+ * Password hashing for orqis's email + password auth.
  *
- * Uses scrypt from node:crypto rather than bcrypt/argon2 so we add no native
- * dependency — scrypt is a memory-hard KDF and is the right primitive for
- * this. Parameters are stored inside the hash string, so raising the cost
- * later doesn't invalidate existing hashes: verify reads N/r/p from the
- * stored value, and only newly-set passwords use the new cost.
+ * bcrypt is the primary algorithm. `bcryptjs` rather than the native `bcrypt`
+ * package: it is pure JavaScript, so there is no node-gyp step, no prebuilt
+ * binary to match against the host's libc, and nothing to go wrong on a
+ * container build. It produces standard `$2b$` hashes, byte-identical to the
+ * native implementation and readable by it, so switching later is a one-line
+ * change with no re-hashing.
  *
- * Stored format:  scrypt$<N>$<r>$<p>$<salt hex>$<derived key hex>
+ * Cost factor 12: roughly 200-300ms per hash on typical hardware. High enough
+ * to be expensive to attack offline, low enough that a login doesn't feel
+ * slow. Raise it as hardware improves — `verifyPassword` reads the cost from
+ * each stored hash, so old hashes keep verifying at whatever cost they were
+ * written with.
+ *
+ * ── Legacy scrypt hashes ────────────────────────────────────────────
+ * Accounts created before this change hold scrypt hashes in the format
+ * `scrypt$<N>$<r>$<p>$<salt hex>$<key hex>`. Those are still verified, so
+ * nobody is locked out, and `needsRehash()` lets the login path quietly
+ * upgrade them to bcrypt on the next successful sign-in.
  */
 
-const scrypt = promisify(scryptCb) as (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-  options: { N: number; r: number; p: number; maxmem: number }
-) => Promise<Buffer>;
-
-// N=16384, r=8, p=1 is the node default and a reasonable interactive cost.
-// maxmem must exceed 128 * N * r (= 16 MiB here) or scrypt throws.
-const N = 16_384;
-const R = 8;
-const P = 1;
-const MAXMEM = 64 * 1024 * 1024;
-const KEY_BYTES = 64;
-const SALT_BYTES = 16;
+const BCRYPT_ROUNDS = 12;
 
 export const MIN_PASSWORD_LENGTH = 8;
-export const MAX_PASSWORD_LENGTH = 200;
+// bcrypt silently truncates at 72 bytes. Rejecting above that is honest —
+// accepting a 200-character password and only using the first 72 is not.
+export const MAX_PASSWORD_LENGTH = 72;
 
 /**
  * Deliberately permissive: length only. Composition rules (one upper, one
@@ -43,21 +42,62 @@ export function passwordProblem(plain: string): string | null {
   if (plain.length < MIN_PASSWORD_LENGTH) {
     return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
-  if (plain.length > MAX_PASSWORD_LENGTH) {
-    return `Password must be at most ${MAX_PASSWORD_LENGTH} characters.`;
+  // Measure bytes, not characters — bcrypt's limit is on bytes, and an emoji
+  // or accented character costs more than one.
+  if (Buffer.byteLength(plain, "utf8") > MAX_PASSWORD_LENGTH) {
+    return `Password must be at most ${MAX_PASSWORD_LENGTH} bytes (about ${MAX_PASSWORD_LENGTH} plain characters).`;
   }
   return null;
 }
 
 export async function hashPassword(plain: string): Promise<string> {
-  const salt = randomBytes(SALT_BYTES);
-  const key = await scrypt(plain, salt, KEY_BYTES, { N, r: R, p: P, maxmem: MAXMEM });
-  return `scrypt$${N}$${R}$${P}$${salt.toString("hex")}$${key.toString("hex")}`;
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
+}
+
+/** A stored hash is bcrypt if it carries one of the standard bcrypt prefixes. */
+function isBcryptHash(stored: string): boolean {
+  return /^\$2[abxy]\$/.test(stored);
 }
 
 export async function verifyPassword(plain: string, stored: string): Promise<boolean> {
   if (typeof plain !== "string" || typeof stored !== "string" || !stored) return false;
 
+  if (isBcryptHash(stored)) {
+    try {
+      return await bcrypt.compare(plain, stored);
+    } catch {
+      return false;
+    }
+  }
+
+  // Pre-bcrypt account. Verify against the old scheme so existing users can
+  // still sign in; the caller re-hashes afterwards via needsRehash().
+  return verifyLegacyScrypt(plain, stored);
+}
+
+/**
+ * True when a stored hash should be replaced after a successful login —
+ * either it predates bcrypt, or it was written at a lower cost factor than
+ * we now use.
+ */
+export function needsRehash(stored: string): boolean {
+  if (!isBcryptHash(stored)) return true;
+  const rounds = Number(stored.split("$")[2]);
+  return !Number.isFinite(rounds) || rounds < BCRYPT_ROUNDS;
+}
+
+// ── Legacy scrypt verification ──────────────────────────────────────
+
+const scrypt = promisify(scryptCb) as (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  options: { N: number; r: number; p: number; maxmem: number }
+) => Promise<Buffer>;
+
+const MAXMEM = 64 * 1024 * 1024;
+
+async function verifyLegacyScrypt(plain: string, stored: string): Promise<boolean> {
   const parts = stored.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;
 
@@ -65,7 +105,7 @@ export async function verifyPassword(plain: string, stored: string): Promise<boo
   const r = Number(parts[2]);
   const p = Number(parts[3]);
   if (!Number.isInteger(n) || !Number.isInteger(r) || !Number.isInteger(p)) return false;
-  // Guard against a tampered/corrupt row asking for an absurd allocation.
+  // Guard against a tampered row asking for an absurd allocation.
   if (128 * n * r > MAXMEM) return false;
 
   let salt: Buffer;
@@ -84,6 +124,8 @@ export async function verifyPassword(plain: string, stored: string): Promise<boo
   } catch {
     return false;
   }
-
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
+
+// `randomBytes` is retained for tests that want to synthesise a legacy hash.
+export { randomBytes as _randomBytesForTests };

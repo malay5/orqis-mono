@@ -2,7 +2,12 @@ import type { FastifyPluginAsync } from "fastify";
 import { connectMongoose } from "../../db/mongoose.js";
 import { UserModel } from "../../models/User.js";
 import { grantCredits } from "../../platform/credit-mutations.js";
-import { hashPassword, passwordProblem, verifyPassword } from "../../platform/password.js";
+import {
+  hashPassword,
+  needsRehash,
+  passwordProblem,
+  verifyPassword,
+} from "../../platform/password.js";
 import { signJwt, TOKEN_TTL_SECONDS } from "../../platform/jwt.js";
 import { requireCaller } from "../../platform/caller.js";
 import { SIGNUP_BONUS_CREDITS } from "../../platform/billing-config.js";
@@ -113,6 +118,20 @@ export const platformAuthRoutes: FastifyPluginAsync = async (app) => {
     if (!user?.passwordHash) return reply.code(401).send(invalid);
     if (!(await verifyPassword(password, user.passwordHash))) {
       return reply.code(401).send(invalid);
+    }
+
+    // Transparent upgrade: accounts created before bcrypt still hold scrypt
+    // hashes, and older bcrypt hashes may carry a lower cost factor. Now that
+    // we have the plaintext and know it's correct, quietly re-hash. Failures
+    // here must not block a valid login — the user is already authenticated,
+    // and the old hash keeps working until the next attempt.
+    if (needsRehash(user.passwordHash)) {
+      try {
+        const upgraded = await hashPassword(password);
+        await UserModel.updateOne({ _id: user._id }, { $set: { passwordHash: upgraded } });
+      } catch (err) {
+        app.log.warn({ err }, "[auth] password re-hash failed; leaving the existing hash in place");
+      }
     }
 
     // Keep role in step with the ADMIN_EMAILS allowlist on every login:

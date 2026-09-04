@@ -24,6 +24,7 @@
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "axe-core": "^4.12.1",
+    "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "chrome-launcher": "^1.2.1",
     "disposable-email-domains": "^1.0.62",
